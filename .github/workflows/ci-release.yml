@@ -43,7 +43,7 @@ jobs:
         arch: [amd64, arm64]
 
     # Use older Ubuntu versions instead of 24/latest for wider compatibility of glibc
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-22.04-arm' || matrix.arch == 'amd64' && 'ubuntu-20.04' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-22.04-arm' || matrix.arch == 'amd64' && 'ubuntu-22.04' }}
 
     steps:
       - uses: actions/checkout@v4
