@@ -1,0 +1,33 @@
+# docker build -f Dockerfile.debank --build-arg GITHUB_TOKEN=xxx -t blockchain/kava-x:latest .
+
+FROM golang:1.22-alpine AS go-builder
+
+RUN set -eux; apk add --no-cache ca-certificates build-base libusb-dev linux-headers git;
+
+ARG GITHUB_TOKEN
+
+RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
+
+WORKDIR /code
+COPY . /code/
+
+RUN GOPRIVATE='github.com/Chaintable/*' make install
+
+# --------------------------------------------------------
+FROM alpine:3.18
+
+RUN apk add bash jq curl
+COPY --from=go-builder /go/bin/kava /usr/bin/kava
+
+WORKDIR /opt
+
+# EVM JSON-RPC
+EXPOSE 8545
+# EVM WebSocket
+EXPOSE 8546
+# Tendermint P2P
+EXPOSE 26656
+# Tendermint RPC
+EXPOSE 26657
+
+CMD ["/usr/bin/kava", "version"]
