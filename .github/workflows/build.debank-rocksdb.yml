@@ -18,10 +18,7 @@ env:
 
 jobs:
   build-rocksdb:
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
-    runs-on: [ self-hosted, "${{ matrix.arch }}" ]
+    runs-on: [ self-hosted, "amd64" ]
     steps:
 
       - name: Checkout code
@@ -57,42 +54,6 @@ jobs:
           file: ${{ env.DOCKERFILE }}
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ matrix.arch }}-${{ env.REVISION }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:amd64-${{ env.REVISION }}
           build-args: GITHUB_TOKEN=${{ steps.generate-token.outputs.token }}
           provenance: false
-
-  merge-docker-manifest:
-    runs-on: [self-hosted, general]
-    needs: build-rocksdb
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Set env (determine image tag)
-        run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "REVISION=${GITHUB_REF#refs/*/}-rocksdb" >> $GITHUB_ENV
-          else
-            echo "REVISION=$(git rev-parse --short=7 HEAD)-rocksdb" >> $GITHUB_ENV
-          fi
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Merge manifest
-        run: |
-          docker pull --platform=linux/amd64 ${REGISTRY}/${IMAGE}:amd64-${REVISION}
-          docker pull --platform=linux/arm64 ${REGISTRY}/${IMAGE}:arm64-${REVISION}
-          docker buildx imagetools create --tag ${REGISTRY}/${IMAGE}:${REVISION} ${REGISTRY}/${IMAGE}:amd64-${REVISION} ${REGISTRY}/${IMAGE}:arm64-${REVISION}
-
-      - name: Lark Notification
-        continue-on-error: true
-        run: |
-          notiv3 "Blockchain kava-x (rocksdb) image pushed" ${REGISTRY}/${IMAGE}:${REVISION}
