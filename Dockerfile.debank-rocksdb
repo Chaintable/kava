@@ -3,13 +3,17 @@
 
 FROM kava/rocksdb:v8.10.1-go1.21 AS go-builder
 
+# Replace Go 1.21 with 1.22 (required by go.mod)
+RUN rm -rf /usr/local/go && \
+    curl -fsSL https://go.dev/dl/go1.22.8.linux-amd64.tar.gz | tar -C /usr/local -xz
+
 ARG GITHUB_TOKEN
 RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
 
 WORKDIR /code
 COPY . /code/
 
-RUN GOPRIVATE='github.com/Chaintable/*' GOTOOLCHAIN=local make install COSMOS_BUILD_OPTIONS=rocksdb
+RUN GOPRIVATE='github.com/Chaintable/*' make install COSMOS_BUILD_OPTIONS=rocksdb
 
 # --------------------------------------------------------
 FROM ubuntu:22.04
