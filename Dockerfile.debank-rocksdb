@@ -1,0 +1,44 @@
+# RocksDB version of the debank kava image
+# Uses kava's official rocksdb base image with pre-built rocksdb shared libs
+
+FROM kava/rocksdb:v8.10.1-go1.21 AS go-builder
+
+# Upgrade Go to 1.22 (base image has 1.21)
+RUN go install golang.org/dl/go1.22.8@latest && \
+    /root/go/bin/go1.22.8 download && \
+    ln -sf /root/sdk/go1.22.8/bin/go /usr/local/go/bin/go
+
+ARG GITHUB_TOKEN
+RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
+
+WORKDIR /code
+COPY . /code/
+
+RUN GOPRIVATE='github.com/Chaintable/*' make install COSMOS_BUILD_OPTIONS=rocksdb
+
+# --------------------------------------------------------
+FROM ubuntu:22.04
+
+RUN apt-get update \
+    && apt-get install -y libsnappy1v5 libgflags2.2 zlib1g libbz2-1.0 curl jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# copy rocksdb shared objects
+COPY --from=go-builder /usr/local/lib/ /usr/local/lib/
+RUN ldconfig
+
+# copy kava binary
+COPY --from=go-builder /go/bin/kava /usr/bin/kava
+
+WORKDIR /opt
+
+# EVM JSON-RPC
+EXPOSE 8545
+# EVM WebSocket
+EXPOSE 8546
+# Tendermint P2P
+EXPOSE 26656
+# Tendermint RPC
+EXPOSE 26657
+
+CMD ["/usr/bin/kava", "version"]
