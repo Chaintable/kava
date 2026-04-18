@@ -26,7 +26,6 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/evmos/ethermint/server/config"
-	"github.com/evmos/ethermint/x/evm/statedb"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 
 	"github.com/kava-labs/kava/x/evmutil/types"
@@ -121,23 +120,13 @@ func (k Keeper) CallEVMWithData(
 		true,                  // checkNonce
 	)
 
-	// Use StateDiffCollector instead of NoOpTracer to capture state changes
-	// from non-EVM paths for trace_debankBlock.
-	collector := statedb.NewStateDiffCollector()
-	res, err := k.evmKeeper.ApplyMessage(ethGasContext, msg, collector, true)
+	res, err := k.evmKeeper.ApplyMessage(ethGasContext, msg, evmtypes.NewNoOpTracer(), true)
 	if err != nil {
 		return nil, err
 	}
 
 	if res.Failed() {
 		return nil, errorsmod.Wrap(evmtypes.ErrVMExecution, res.VmError)
-	}
-
-	// Persist collected state diff so trace_debankBlock can include it.
-	if !collector.IsEmpty() {
-		if sdErr := k.evmKeeper.AppendNonEVMStateDiff(ctx, collector.ToStateDiff()); sdErr != nil {
-			ctx.Logger().Error("evmutil: failed to persist non-EVM state diff", "err", sdErr)
-		}
 	}
 
 	ctx.GasMeter().ConsumeGas(res.GasUsed, "evm gas consumed")
