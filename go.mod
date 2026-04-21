@@ -236,7 +236,7 @@ replace (
 	github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v4 v4.4.2
 	// Use debank-patched ethermint with trace_debankBlock support
 	// Branch: chain/kava on Chaintable/ethermint
-	github.com/evmos/ethermint => github.com/Chaintable/ethermint v0.0.0-20260421174059-74b83e01b326
+	github.com/evmos/ethermint => github.com/Chaintable/ethermint v0.0.0-20260422020149-40aa28eee4d3
 	// See https://github.com/cosmos/cosmos-sdk/pull/10401, https://github.com/cosmos/cosmos-sdk/commit/0592ba6158cd0bf49d894be1cef4faeec59e8320
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.0
 	// See https://github.com/cometbft/cometbft-db/pull/191
