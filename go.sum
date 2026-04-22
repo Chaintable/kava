@@ -217,6 +217,8 @@ github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg6
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/ChainSafe/go-schnorrkel v1.1.0 h1:rZ6EU+CZFCjB4sHUE1jIu8VDoB/wRKZxoe1tkcO71Wk=
 github.com/ChainSafe/go-schnorrkel v1.1.0/go.mod h1:ABkENxiP+cvjFiByMIZ9LYbRoNNLeBLiakC1XeTFxfE=
+github.com/Chaintable/ethermint v0.0.0-20260422091112-92da0e314d34 h1:uDhy3T2liNw5fxw0q4rQZtE05cmk8ztpCVs0s0Wu/3w=
+github.com/Chaintable/ethermint v0.0.0-20260422091112-92da0e314d34/go.mod h1:zGcUyJhdcoO0VfxAQwiXpGjBAV8w+Hig1yaH2l7KB5k=
 github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/zstd v1.5.0/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
@@ -905,8 +907,6 @@ github.com/kava-labs/cometbft v0.37.18-kava.1 h1:Gfocqy4pmT2SYo6Gjh8AZ0lhV8hzqGQ
 github.com/kava-labs/cometbft v0.37.18-kava.1/go.mod h1:t/BvwfSJKt2HUHX01L6y1+uw+LOoxU6hFj447wOB5IA=
 github.com/kava-labs/cosmos-sdk v0.47.15-iavl-v1-kava.1 h1:8cGSQsQgdpE8TGyU86WbNVRlRmzrDMGV9r16wl/CIMA=
 github.com/kava-labs/cosmos-sdk v0.47.15-iavl-v1-kava.1/go.mod h1:3pOQQAEomoC6oCIWuYoVJdadWFexIkHmi2pGsPKQo90=
-github.com/kava-labs/ethermint v0.21.0-kava-v27.0 h1:TzFhLQULsyQUA+b620FMGvZHTNriRuWLFGShwW/4xCA=
-github.com/kava-labs/ethermint v0.21.0-kava-v27.0/go.mod h1:zGcUyJhdcoO0VfxAQwiXpGjBAV8w+Hig1yaH2l7KB5k=
 github.com/kava-labs/iavl v1.2.0-kava.2 h1:RfEqQ9u7fvhzXOfYxxqEnVNCTb3pYJiT7X86N6cgI0M=
 github.com/kava-labs/iavl v1.2.0-kava.2/go.mod h1:nNoeUFw64lfPvcj3yZ7W7BvmlTxu9ANGsJcUiPSOAdw=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=

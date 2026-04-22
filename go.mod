@@ -234,8 +234,8 @@ replace (
 	github.com/cosmos/iavl => github.com/kava-labs/iavl v1.2.0-kava.2
 	// See https://github.com/cosmos/cosmos-sdk/pull/13093
 	github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v4 v4.4.2
-	// Use ethermint fork that respects min-gas-price with NoBaseFee true and london enabled, and includes eip712 support
-	github.com/evmos/ethermint => github.com/kava-labs/ethermint v0.21.0-kava-v27.0
+	// Use ethermint fork with debank tracer + evmutil replay support
+	github.com/evmos/ethermint => github.com/Chaintable/ethermint v0.0.0-20260422091112-92da0e314d34
 	// See https://github.com/cosmos/cosmos-sdk/pull/10401, https://github.com/cosmos/cosmos-sdk/commit/0592ba6158cd0bf49d894be1cef4faeec59e8320
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.0
 	// See https://github.com/cometbft/cometbft-db/pull/191
