@@ -217,8 +217,8 @@ github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg6
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/ChainSafe/go-schnorrkel v1.1.0 h1:rZ6EU+CZFCjB4sHUE1jIu8VDoB/wRKZxoe1tkcO71Wk=
 github.com/ChainSafe/go-schnorrkel v1.1.0/go.mod h1:ABkENxiP+cvjFiByMIZ9LYbRoNNLeBLiakC1XeTFxfE=
-github.com/Chaintable/ethermint v0.0.0-20260422175700-066874855edc h1:N2QGrn0TwkvQGyfiFq2TOLuKy9z4KKSbjywCPjEsBWw=
-github.com/Chaintable/ethermint v0.0.0-20260422175700-066874855edc/go.mod h1:zGcUyJhdcoO0VfxAQwiXpGjBAV8w+Hig1yaH2l7KB5k=
+github.com/Chaintable/ethermint v0.0.0-20260423023015-1ec8b4ae05b7 h1:GkhvIWIVWxQBbNcE7o/4zxlD78zgNggn0V7olMp8FNw=
+github.com/Chaintable/ethermint v0.0.0-20260423023015-1ec8b4ae05b7/go.mod h1:zGcUyJhdcoO0VfxAQwiXpGjBAV8w+Hig1yaH2l7KB5k=
 github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/zstd v1.5.0/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
