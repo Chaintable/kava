@@ -7,6 +7,7 @@ on:
   release:
     types:
       - created
+      - released
 
   workflow_dispatch:
 
@@ -26,8 +27,6 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: tibdex/github-app-token@v1
         id: generate-token
@@ -67,8 +66,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set env (determine image tag)
         run: |
