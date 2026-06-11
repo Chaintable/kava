@@ -11,14 +11,17 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: ap-northeast-1
-  REGISTRY: 294354037686.dkr.ecr.ap-northeast-1.amazonaws.com
-  IMAGE: blockchain/kava-x
+  AWS_REGION: us-east-1
+  REGISTRY: public.ecr.aws/b2h7a5c4/chaintable
+  IMAGE: kava-writer
   DOCKERFILE: Dockerfile.debank-rocksdb
 
 jobs:
   build-rocksdb:
     runs-on: [ self-hosted, "amd64" ]
+    permissions:
+      contents: read
+      id-token: write
     steps:
 
       - name: Checkout code
@@ -40,13 +43,16 @@ jobs:
             echo "REVISION=$(git rev-parse --short=7 HEAD)-rocksdb" >> $GITHUB_ENV
           fi
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
 
       - name: Build and push image
         uses: docker/build-push-action@v5
