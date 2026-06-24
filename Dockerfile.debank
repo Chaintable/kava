@@ -4,10 +4,6 @@ FROM golang:1.22-alpine AS go-builder
 
 RUN set -eux; apk add --no-cache ca-certificates build-base libusb-dev linux-headers git;
 
-ARG GITHUB_TOKEN
-
-RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
-
 WORKDIR /code
 COPY . /code/
 
