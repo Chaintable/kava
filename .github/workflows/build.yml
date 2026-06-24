@@ -1,4 +1,4 @@
-name: "Build artifacts (RocksDB)"
+name: "Build artifacts"
 
 on:
   pull_request:
@@ -14,10 +14,10 @@ env:
   AWS_REGION: us-east-1
   REGISTRY: public.ecr.aws/b2h7a5c4/chaintable
   IMAGE: kava-writer
-  DOCKERFILE: Dockerfile.debank-rocksdb
+  DOCKERFILE: Dockerfile.debank
 
 jobs:
-  build-rocksdb:
+  build-artifacts:
     strategy:
       matrix:
         arch: [amd64, arm64]
@@ -32,18 +32,20 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - uses: tibdex/github-app-token@v1
+      - name: Generate app token
         id: generate-token
+        uses: actions/create-github-app-token@v1
         with:
-          app_id: ${{ secrets.RELEASE_MANAGER_APP_ID }}
-          private_key: ${{ secrets.RELEASE_MANAGER_APP_SECRET }}
+          app-id: ${{ secrets.RELEASE_MANAGER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_MANAGER_APP_SECRET }}
+          owner: ${{ github.repository_owner }}
 
       - name: Set env (determine image tag)
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "REVISION=${GITHUB_REF#refs/*/}-rocksdb" >> $GITHUB_ENV
+            echo "REVISION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
           else
-            echo "REVISION=$(git rev-parse --short=7 HEAD)-rocksdb" >> $GITHUB_ENV
+            echo "REVISION=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
           fi
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -56,6 +58,9 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
         with:
           registry-type: public
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push image
         uses: docker/build-push-action@v5
@@ -68,12 +73,22 @@ jobs:
           provenance: false
 
   merge-docker-manifest:
-    runs-on: [self-hosted, general]
-    needs: build-rocksdb
+    runs-on: ubuntu-latest
+    needs: build-artifacts
     permissions:
       contents: read
       id-token: write
     steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
       - name: Checkout code
         uses: actions/checkout@v2
         with:
@@ -82,9 +97,9 @@ jobs:
       - name: Set env (determine image tag)
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "REVISION=${GITHUB_REF#refs/*/}-rocksdb" >> $GITHUB_ENV
+            echo "REVISION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
           else
-            echo "REVISION=$(git rev-parse --short=7 HEAD)-rocksdb" >> $GITHUB_ENV
+            echo "REVISION=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
           fi
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -97,6 +112,9 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
         with:
           registry-type: public
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Merge manifest
         run: |

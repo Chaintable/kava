@@ -16,8 +16,8 @@ RUN git clone https://github.com/facebook/rocksdb.git /tmp/rocksdb && \
     ldconfig && \
     rm -rf /tmp/rocksdb
 
-ARG GITHUB_TOKEN
-RUN git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"
+ARG GITHUB_TOKEN=""
+RUN if [ -n "$GITHUB_TOKEN" ]; then git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com".insteadOf "https://github.com"; fi
 
 WORKDIR /code
 COPY . /code/
