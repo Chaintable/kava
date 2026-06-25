@@ -25,6 +25,11 @@ Chaintable write node (this repo · producer, embeds pipeline tracer)
 
 <div align="center">
 
+[![version](https://img.shields.io/github/tag/kava-labs/kava.svg)](https://github.com/kava-labs/kava/releases/latest)
+[![CircleCI](https://circleci.com/gh/Kava-Labs/kava/tree/master.svg?style=shield)](https://circleci.com/gh/Kava-Labs/kava/tree/master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kava-labs/kava)](https://goreportcard.com/report/github.com/kava-labs/kava)
+[![API Reference](https://godoc.org/github.com/Kava-Labs/kava?status.svg)](https://godoc.org/github.com/Kava-Labs/kava)
+[![GitHub](https://img.shields.io/github/license/kava-labs/kava.svg)](https://github.com/Kava-Labs/kava/blob/master/LICENSE.md)
 [![Twitter Follow](https://img.shields.io/twitter/follow/KAVA_CHAIN.svg?label=Follow&style=social)](https://twitter.com/KAVA_CHAIN)
 [![Discord Chat](https://img.shields.io/discord/704389840614981673.svg)](https://discord.com/invite/kQzh3Uv)
 
@@ -40,7 +45,7 @@ Reference implementation of Kava, a blockchain for cross-chain DeFi. Built using
 
 ## Mainnet
 
-The current recommended version of the software for mainnet is [v0.26.2](https://github.com/Chaintable/kava/releases). Binary archives and images for this fork are published by CI to Chaintable's public ECR; see [this repo's releases](https://github.com/Chaintable/kava/releases). The `master` branch of this repository often contains considerable development work since the last mainnet release and is __not__ runnable on mainnet.
+The current recommended version of the software for mainnet is [v0.26.2](https://github.com/Kava-Labs/kava/releases/tag/v0.26.2) The `master` branch of this repository often contains considerable development work since the last mainnet release and is __not__ runnable on mainnet.
 
 ### Installation and Setup
 For detailed instructions see [the Kava docs](https://docs.kava.io/docs/nodes-and-validators/validator-node).
@@ -55,8 +60,7 @@ This is included as a git submodule at [`tests/e2e/kvtool`](tests/e2e/kvtool/).
 When first cloning the repository, if you intend to run the e2e integration tests, you must also
 clone the submodules:
 ```bash
-git clone --recurse-submodules https://github.com/Chaintable/kava.git
-cd kava
+git clone --recurse-submodules https://github.com/Kava-Labs/kava.git
 ```
 
 Or, if you have already cloned the repo: `git submodule update --init`
