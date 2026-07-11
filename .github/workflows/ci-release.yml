@@ -4,6 +4,10 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # run default ci checks against released version
   default-checks:
@@ -13,7 +17,7 @@ jobs:
   get-version-tag:
     # prep version release only if all checks pass
     needs: default-checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu2404-linux-x86-64-16c
     outputs:
       git-tag: ${{ steps.git-tag.outputs.tag }}
     steps:
