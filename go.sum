@@ -219,6 +219,8 @@ github.com/ChainSafe/go-schnorrkel v1.1.0 h1:rZ6EU+CZFCjB4sHUE1jIu8VDoB/wRKZxoe1
 github.com/ChainSafe/go-schnorrkel v1.1.0/go.mod h1:ABkENxiP+cvjFiByMIZ9LYbRoNNLeBLiakC1XeTFxfE=
 github.com/Chaintable/ethermint v0.0.0-20260508025611-1e1ef166c621 h1:+01IztDbpvFhy+2DLLJaJ/W/EJIr8g27lshCLxsu4Ik=
 github.com/Chaintable/ethermint v0.0.0-20260508025611-1e1ef166c621/go.mod h1:zGcUyJhdcoO0VfxAQwiXpGjBAV8w+Hig1yaH2l7KB5k=
+github.com/Chaintable/ethermint v0.0.0-20260812080420-d123ca08e145 h1:9foHkaMpz1LuIRjk4JIz23PQnELewGOjpUJrbpcyHvg=
+github.com/Chaintable/ethermint v0.0.0-20260812080420-d123ca08e145/go.mod h1:zGcUyJhdcoO0VfxAQwiXpGjBAV8w+Hig1yaH2l7KB5k=
 github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/zstd v1.5.0/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
