@@ -1,8 +1,6 @@
 module github.com/kava-labs/kava/tests/interchain
 
-go 1.22.7
-
-toolchain go1.22.8
+go 1.24
 
 require (
 	cosmossdk.io/math v1.4.0
@@ -154,7 +152,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
