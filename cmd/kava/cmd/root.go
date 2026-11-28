@@ -142,5 +142,7 @@ func addSubCmds(rootCmd *cobra.Command, encodingConfig params.EncodingConfig, de
 		rocksdb.RocksDBCmd,
 		newShardCmd(opts),
 		iavlviewer.NewCmd(opts),
+		newReplayCmd(encodingConfig),
+		newReplayServeCmd(encodingConfig),
 	)
 }

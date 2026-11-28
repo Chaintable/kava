@@ -17,6 +17,20 @@ Chaintable write node (this repo · producer, embeds pipeline tracer)
         └─ block files (tx · trace · receipts · events) ──→ S3 ─→ Chaintable indexing pipeline (tx/trace data)
 ```
 
+## Replay a Kava v0.28 archive
+
+The replay commands open a stopped archive under `--home/data` containing `application.db`, `blockstore.db` and `state.db`. Build with `COSMOS_BUILD_OPTIONS=rocksdb make install` for RocksDB archives. The default build supports GoLevelDB.
+
+```sh
+kava replay-block 23294356 --home /path/to/kava
+kava replay-block 23294355 23294360 --home /path/to/kava > blocks.ndjson
+kava replay-serve --home /path/to/kava --listen 127.0.0.1:8545
+```
+
+The range is inclusive. The HTTP server exposes `trace_debankBlock` by height or hash, `eth_chainId`, and `eth_blockNumber`. Each result contains the header, blockfile, RLP state diff and validation hash. The v0.28 mainnet segment starts at 14,136,737. Replaying H requires its parent state, the committed IAVL trees at H, historical validators and consensus parameters, the original CometBFT ABCI responses at H (including events), and the H+1 header for verification. A missing or unreadable response fails that height.
+
+Each block executes in a private overlay. Sequential requests reuse the vesting schedule. A new starting height requires one scan of the parent auth store.
+
 ---
 
 <p align="center">
