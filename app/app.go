@@ -277,6 +277,7 @@ type Options struct {
 	EVMTrace              string
 	EVMMaxGasWanted       uint64
 	TelemetryOptions      metricstypes.TelemetryOptions
+	replayMessages        *replayMsgServer
 }
 
 // DefaultOptions is a sensible default Options value.
@@ -1000,7 +1001,8 @@ func NewApp(
 
 	app.mm.RegisterInvariants(&app.crisisKeeper)
 
-	app.configurator = module.NewConfigurator(app.appCodec, app.MsgServiceRouter(), app.GRPCQueryRouter())
+	msgRouter := options.replayMessages.wrap(app.MsgServiceRouter())
+	app.configurator = module.NewConfigurator(app.appCodec, msgRouter, app.GRPCQueryRouter())
 	app.RegisterServices(app.configurator)
 
 	// RegisterUpgradeHandlers is used for registering any on-chain upgrades.

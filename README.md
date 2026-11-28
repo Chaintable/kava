@@ -44,6 +44,17 @@ git clone --recurse-submodules https://github.com/Kava-Labs/kava.git
 
 Or, if you have already cloned the repo: `git submodule update --init`
 
+## Historical block replay
+
+This build replays Kava mainnet heights 12,766,500 through 14,136,736. Use a stopped archive with the block store, ABCI state database and IAVL v1 application database under the node home's `data` directory. For RocksDB, build with `COSMOS_BUILD_OPTIONS=rocksdb make install`.
+
+```sh
+kava replay-block 12766500 12766501 --home /path/to/archive
+kava replay-serve --home /path/to/archive --listen 127.0.0.1:8545
+```
+
+The CLI writes one JSON result per block. The HTTP method `trace_debankBlock` accepts a height, block hash or `latest`. Both commands require the parent state, committed application state and ABCI responses at the requested height, and the successor header.
+
 ## Testnet
 
 For further information on joining the testnet, head over to the [testnet repo](https://github.com/Kava-Labs/kava-testnets).
