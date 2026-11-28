@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -273,7 +274,16 @@ func TestReplayArchive(t *testing.T) {
 		transfers = append(transfers, signEth(uint64(n+5), &contract, nil))
 	}
 	full := commitBlock(f.BlockTime.Add(36*time.Second), transfers...)
-	commitBlock(f.BlockTime.Add(42 * time.Second))
+	// The constructor writes slot zero, emits LOG0, and returns runtime code.
+	constructor := common.FromHex("0x600160005560006000a0600a6016600039600a6000f3602a60005260206000f3")
+	ctx := canonical.NewUncachedContext(false, *full.Header.ToProto())
+	firstNonce := canonical.accountKeeper.GetAccount(ctx, sender.Bytes()).GetSequence()
+	creations := make([]tmtypes.Tx, len(transfers))
+	for i := range creations {
+		creations[i] = signEth(firstNonce+uint64(i), nil, constructor)
+	}
+	deployments := commitBlock(f.BlockTime.Add(42*time.Second), creations...)
+	commitBlock(f.BlockTime.Add(48 * time.Second))
 	// Reopen the block-store height cache after the archive is frozen.
 	replay.blocks = store.NewBlockStore(blockDB)
 	frozen := canonical.LastCommitID()
@@ -381,6 +391,34 @@ func TestReplayArchive(t *testing.T) {
 	require.NotEmpty(t, file.ErrorTraces)
 	require.Len(t, file.ErrorEvents, 1)
 	t.Run("executed block OOG requires tracer", func(t *testing.T) { checkReplayMissingOOGTrace(t, replay, full, val) })
+	blockFile, changes := at(deployments)
+	t.Run("deployment rolled back by block gas", func(t *testing.T) {
+		require.NotEmpty(t, blockFile.Txs)
+		failedTx := blockFile.Txs[len(blockFile.Txs)-1]
+		require.False(t, failedTx.Status)
+		require.Len(t, blockFile.ErrorTraces, 1)
+		root := blockFile.ErrorTraces[0]
+		require.Equal(t, failedTx.ID, root.TxID)
+		require.Equal(t, "create", root.CallCreateType)
+		require.Equal(t, "exceeds block gas limit", root.Error)
+		require.Equal(t, common.Address{}.Hex(), root.To)
+		require.Equal(t, "0x", root.Output.String())
+		require.Len(t, blockFile.ErrorEvents, 1)
+		require.NotEmpty(t, blockFile.Traces)
+		require.Equal(t, "0x602a60005260206000f3", blockFile.Traces[0].Output.String())
+
+		committed := crypto.CreateAddress(sender, firstNonce)
+		discarded := crypto.CreateAddress(sender, failedTx.Nonce.Uint64())
+		require.Contains(t, blockFile.StorageContracts, strings.ToLower(committed.Hex()))
+		require.NotContains(t, blockFile.StorageContracts, strings.ToLower(discarded.Hex()))
+		discardedHash := crypto.Keccak256Hash(discarded.Bytes())
+		for _, entry := range changes.NewAccounts {
+			require.NotEqual(t, discardedHash, entry.Address)
+		}
+		for _, entry := range changes.StorageDiff {
+			require.NotEqual(t, discardedHash, entry.Address)
+		}
+	})
 	_, retry := at(empty)
 	require.Equal(t, common.BytesToHash(parent.AppHash), retry.ParentHash)
 	require.Equal(t, frozen, canonical.LastCommitID())
