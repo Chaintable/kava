@@ -26,6 +26,7 @@ import (
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	"github.com/holiman/uint256"
 
+	utilkeeper "github.com/kava-labs/kava/x/evmutil/keeper"
 	utiltypes "github.com/kava-labs/kava/x/evmutil/types"
 )
 
@@ -82,13 +83,26 @@ func (a *App) seedVesting(ctx context.Context, db dbm.DB, id storetypes.CommitID
 		return nil, fmt.Errorf("vesting parent root mismatch at %d", id.Version)
 	}
 	prefix := authtypes.AddressStoreKeyPrefix
-	it, err := parent.Iterator(prefix, storetypes.PrefixEndBytes(prefix), true)
+	end := storetypes.PrefixEndBytes(prefix)
+	// This IAVL version can stop iterating on a missing child without setting
+	// Iterator.Error. The ranks in the same root give an independent leaf count.
+	first, _, err := parent.GetWithIndex(prefix)
+	if err != nil {
+		return nil, err
+	}
+	last, _, err := parent.GetWithIndex(end)
+	if err != nil {
+		return nil, err
+	}
+	it, err := parent.Iterator(prefix, end, true)
 	if err != nil {
 		return nil, err
 	}
 	defer it.Close()
 	schedule := vestingSchedule{}
+	var scanned int64
 	for ; it.Valid(); it.Next() {
+		scanned++
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -105,7 +119,13 @@ func (a *App) seedVesting(ctx context.Context, db dbm.DB, id storetypes.CommitID
 		}
 		schedule.update(common.BytesToAddress(key), account, now)
 	}
-	return schedule, it.Error()
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
+	if scanned != last-first {
+		return nil, fmt.Errorf("incomplete vesting scan at %d: read %d of %d auth records", id.Version, scanned, last-first)
+	}
+	return schedule, nil
 }
 
 type replayChanges struct {
@@ -224,7 +244,22 @@ func readStoreChanges(db dbm.DB, name string, height int64, parent, current stor
 }
 
 func (a *App) replayAccount(ctx sdk.Context, addr common.Address) (dtypes.NewAccount, bool, error) {
-	balance := a.evmKeeper.GetBalance(ctx, addr)
+	// SDK SpendableCoins zeros all denominations if any lock is underfunded.
+	// Point reads of the contributing denoms propagate a missing IAVL child.
+	address := sdk.AccAddress(addr.Bytes())
+	balances := sdk.NewCoins(a.bankKeeper.GetBalance(ctx, address, utilkeeper.CosmosDenom))
+	locked := a.bankKeeper.LockedCoins(ctx, address)
+	for _, coin := range locked {
+		if coin.Denom != utilkeeper.CosmosDenom {
+			balances = balances.Add(a.bankKeeper.GetBalance(ctx, address, coin.Denom))
+		}
+	}
+	spendable, negative := balances.SafeSub(locked...)
+	if negative {
+		spendable = nil
+	}
+	whole := spendable.AmountOf(utilkeeper.CosmosDenom).Mul(utilkeeper.ConversionMultiplier)
+	balance := whole.Add(a.evmutilKeeper.GetBalance(ctx, address)).BigInt()
 	amount, overflow := uint256.FromBig(balance)
 	if balance.Sign() < 0 || overflow {
 		return dtypes.NewAccount{}, false, fmt.Errorf("invalid akava balance for %s", addr)

@@ -22,12 +22,7 @@ import (
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 )
 
-type signedCall struct {
-	hash  common.Hash
-	trace *tracer.CallTracer
-}
-
-func (a *App) replayBlockFile(block *tmtypes.Block, results *tmstate.ABCIResponses, observed [][]signedCall, decode sdk.TxDecoder, gasLimit int64, after sdk.Context) (*dtypes.BlockFile, *dtypes.Header, error) {
+func (a *App) replayBlockFile(block *tmtypes.Block, results *tmstate.ABCIResponses, observed [][]*signedCall, decode sdk.TxDecoder, gasLimit int64, after sdk.Context) (*dtypes.BlockFile, *dtypes.Header, error) {
 	file := &dtypes.BlockFile{
 		Txs:         []dtypes.Transaction{},
 		Traces:      []dtypes.Trace{},
@@ -93,12 +88,12 @@ func (a *App) replayBlockFile(block *tmtypes.Block, results *tmstate.ABCIRespons
 			if etx.To() != nil {
 				addrs[*etx.To()] = struct{}{}
 			}
-			var call *tracer.CallTracer
+			var call *signedCall
 			if len(calls) != 0 {
 				if calls[0].hash != hash {
 					return nil, nil, fmt.Errorf("tx[%d]/msg[%d]: observed %s, want %s", i, j, calls[0].hash, hash)
 				}
-				call, calls = calls[0].trace, calls[1:]
+				call, calls = calls[0], calls[1:]
 			}
 			if err := appendReplayTransaction(file, addrs, call, etx, from, fee, j, res, &data); err != nil {
 				return nil, nil, fmt.Errorf("tx[%d]/msg[%d] %s: %w", i, j, hash, err)
@@ -134,39 +129,47 @@ func (a *App) replayBlockFile(block *tmtypes.Block, results *tmstate.ABCIRespons
 	return file, tracer.BuildPilelineBlockHeader(fields), nil
 }
 
-func appendReplayTransaction(file *dtypes.BlockFile, addrs map[common.Address]struct{}, call *tracer.CallTracer, tx *ethtypes.Transaction, from common.Address, fee *big.Int, msgIndex int, outer *abci.ResponseDeliverTx, data *sdk.TxMsgData) error {
+func appendReplayTransaction(file *dtypes.BlockFile, addrs map[common.Address]struct{}, call *signedCall, tx *ethtypes.Transaction, from common.Address, fee *big.Int, msgIndex int, outer *abci.ResponseDeliverTx, data *sdk.TxMsgData) error {
 	// The RPC charges the full signed gas limit for post-execution block OOG.
 	// Ante may also hit this condition before the first VM call.
 	failure, charged := "exceeds block gas limit", tx.Gas()
-	var response evmtypes.MsgEthereumTxResponse
+	if call != nil {
+		if call.trace == nil || call.response == nil {
+			return fmt.Errorf("dispatched EVM message missing tracer or response")
+		}
+		if call.response.Hash != tx.Hash().Hex() {
+			return fmt.Errorf("dispatched response hash mismatch: %s", call.response.Hash)
+		}
+		if call.trace.Evm == nil && (len(call.response.Logs) != 0 || !failsBeforeRootFrame(tx, call.response.VmError)) {
+			return fmt.Errorf("missing root call for message outcome %q", call.response.VmError)
+		}
+	}
 	if outer.Code == 0 {
 		if msgIndex >= len(data.MsgResponses) || data.MsgResponses[msgIndex] == nil || call == nil {
 			return fmt.Errorf("missing signed execution or response")
 		}
 		msg := data.MsgResponses[msgIndex]
+		var response evmtypes.MsgEthereumTxResponse
 		if msg.TypeUrl != "/"+proto.MessageName(&response) {
 			return fmt.Errorf("unexpected response %s", msg.TypeUrl)
 		}
 		if err := response.Unmarshal(msg.Value); err != nil {
 			return err
 		}
-		if response.Hash != tx.Hash().Hex() {
-			return fmt.Errorf("response hash mismatch: %s", response.Hash)
+		if !proto.Equal(call.response, &response) {
+			return fmt.Errorf("dispatched response differs from DeliverTx")
 		}
 		failure, charged = response.VmError, response.GasUsed
 		if len(data.MsgResponses) == 1 {
 			charged = uint64(outer.GasUsed)
 		}
-		if call.Evm == nil && (len(response.Logs) != 0 || !failsBeforeRootFrame(tx, failure)) {
-			return fmt.Errorf("missing root call for message outcome %q", failure)
-		}
 	}
-	if call != nil && call.Evm != nil {
-		tr, err := call.ReplayResult(failure)
+	if call != nil && call.trace.Evm != nil {
+		tr, err := call.trace.ReplayResult(call.response.VmError)
 		if err != nil {
 			return err
 		}
-		if outer.Code == 0 && (tr.Transaction.ID != tx.Hash().Hex() || tr.Transaction.GasUsed == nil || tr.Transaction.GasUsed.Uint64() != response.GasUsed) {
+		if tr.Transaction.ID != tx.Hash().Hex() || tr.Transaction.GasUsed == nil || tr.Transaction.GasUsed.Uint64() != call.response.GasUsed {
 			return fmt.Errorf("traced execution differs from message response")
 		}
 		var roots int
@@ -174,7 +177,7 @@ func appendReplayTransaction(file *dtypes.BlockFile, addrs map[common.Address]st
 			for _, frame := range list {
 				if len(frame.TraceAddress) == 0 {
 					roots++
-					if (frame.Error == "") != (failure == "") {
+					if (frame.Error == "") != (call.response.VmError == "") {
 						return fmt.Errorf("root status differs from message result")
 					}
 				}
@@ -183,10 +186,10 @@ func appendReplayTransaction(file *dtypes.BlockFile, addrs map[common.Address]st
 		if roots != 1 {
 			return fmt.Errorf("expected one root call, got %d", roots)
 		}
-		if len(tr.Events) != len(response.Logs) {
-			return fmt.Errorf("committed log count %d, want %d", len(tr.Events), len(response.Logs))
+		if len(tr.Events) != len(call.response.Logs) {
+			return fmt.Errorf("committed log count %d, want %d", len(tr.Events), len(call.response.Logs))
 		}
-		for i, log := range response.Logs {
+		for i, log := range call.response.Logs {
 			e := &tr.Events[i]
 			topics := e.Topics
 			if e.Selector != "" {
@@ -195,7 +198,15 @@ func appendReplayTransaction(file *dtypes.BlockFile, addrs map[common.Address]st
 			if log == nil || !strings.EqualFold(e.Address, log.Address) || !bytes.Equal(e.Data, log.Data) || !equalTopics(topics, log.Topics) {
 				return fmt.Errorf("committed log %d differs from message result", i)
 			}
-			e.LogIndex = int64(len(file.Events) + i)
+		}
+		if outer.Code != 0 && call.response.VmError == "" {
+			tr, err = call.trace.ReplayResult(failure)
+			if err != nil {
+				return err
+			}
+		}
+		for i := range tr.Events {
+			tr.Events[i].LogIndex = int64(len(file.Events) + i)
 		}
 		for _, addr := range tr.StorageContracts {
 			addrs[common.HexToAddress(addr)] = struct{}{}

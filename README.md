@@ -27,7 +27,7 @@ kava replay-block 23294355 23294360 --home /path/to/kava > blocks.ndjson
 kava replay-serve --home /path/to/kava --listen 127.0.0.1:8545
 ```
 
-The range is inclusive. The HTTP server exposes `trace_debankBlock` by height or hash, `eth_chainId`, and `eth_blockNumber`. Each result contains the header, blockfile, RLP state diff and validation hash. The v0.28 mainnet segment starts at 14,136,737. Replaying H requires its parent state, the committed IAVL trees at H, historical validators and consensus parameters, and the H+1 header for verification.
+The range is inclusive. The HTTP server exposes `trace_debankBlock` by height or hash, `eth_chainId`, and `eth_blockNumber`. Each result contains the header, blockfile, RLP state diff and validation hash. The v0.28 mainnet segment starts at 14,136,737. Replaying H requires its parent state, the committed IAVL trees at H, historical validators and consensus parameters, the original CometBFT ABCI responses at H (including events), and the H+1 header for verification. A missing or unreadable response fails that height.
 
 Each block executes in a private overlay. Sequential requests reuse the vesting schedule. A new starting height requires one scan of the parent auth store.
 

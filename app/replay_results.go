@@ -2,9 +2,9 @@ package app
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
+	dbm "github.com/cometbft/cometbft-db"
 	abci "github.com/cometbft/cometbft/abci/types"
 	tmstate "github.com/cometbft/cometbft/proto/tendermint/state"
 	"github.com/cometbft/cometbft/state"
@@ -13,20 +13,41 @@ import (
 	rpctypes "github.com/evmos/ethermint/rpc/types"
 )
 
-// LastResultsHash authenticates the deterministic parts of DeliverTx. Where
-// the archive retains the original responses, also verify the fields the writer
-// uses that Comet omits from that hash: ABCI events and block-gas diagnostics.
+// These Comet v0.37 state readers exit the process on a protobuf decode error.
+// Check the records before handing them to Comet for checkpoint resolution.
+type replayCometDB struct{ dbm.DB }
+
+func (d replayCometDB) Get(key []byte) ([]byte, error) {
+	raw, err := d.DB.Get(key)
+	if err != nil || len(raw) == 0 {
+		return raw, err
+	}
+	var record interface{ Unmarshal([]byte) error }
+	switch {
+	case bytes.HasPrefix(key, []byte("abciResponsesKey:")):
+		record = new(tmstate.ABCIResponses)
+	case bytes.HasPrefix(key, []byte("validatorsKey:")):
+		record = new(tmstate.ValidatorsInfo)
+	case bytes.HasPrefix(key, []byte("consensusParamsKey:")):
+		record = new(tmstate.ConsensusParamsInfo)
+	default:
+		return raw, nil
+	}
+	if err := record.Unmarshal(raw); err != nil {
+		return nil, fmt.Errorf("corrupt Comet record %s: %w", key, err)
+	}
+	return raw, nil
+}
+
+// LastResultsHash omits ABCI events and block-gas diagnostics used by the writer.
+// Require the original Comet responses to verify those fields as well.
 func (r *ReplayArchive) verifyResults(height int64, results *tmstate.ABCIResponses, nextHash []byte) error {
 	if !bytes.Equal(state.ABCIResponsesResultsHash(results), nextHash) {
 		return fmt.Errorf("DeliverTx results hash mismatch at %d", height)
 	}
 	want, err := r.state.LoadABCIResponses(height)
-	var missing state.ErrNoABCIResponsesForHeight
-	if errors.As(err, &missing) || errors.Is(err, state.ErrABCIResponsesNotPersisted) {
-		return nil
-	}
 	if err != nil {
-		return err
+		return fmt.Errorf("archived ABCI responses at %d: %w", height, err)
 	}
 	if want.BeginBlock == nil || want.EndBlock == nil || len(want.DeliverTxs) != len(results.DeliverTxs) || !bytes.Equal(state.ABCIResponsesResultsHash(want), nextHash) {
 		return fmt.Errorf("inconsistent archived ABCI responses at %d", height)

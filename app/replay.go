@@ -18,10 +18,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/evmos/ethermint/debank/tracer"
 	rpctypes "github.com/evmos/ethermint/rpc/types"
 
 	"github.com/kava-labs/kava/app/params"
@@ -48,7 +45,7 @@ type ReplayArchive struct {
 func NewReplayArchive(blockDB, stateDB, appDB dbm.DB, scratch string, encoding params.EncodingConfig) *ReplayArchive {
 	return &ReplayArchive{
 		blocks:   store.NewBlockStore(blockDB),
-		state:    state.NewStore(stateDB, state.StoreOptions{}),
+		state:    state.NewStore(replayCometDB{stateDB}, state.StoreOptions{}),
 		db:       appDB,
 		encoding: encoding,
 		scratch:  scratch,
@@ -142,9 +139,14 @@ func (r *ReplayArchive) execute(ctx context.Context, block *tmtypes.Block, paren
 
 	opts := DefaultOptions
 	opts.SkipLoadLatest = true
+	messages := new(replayMsgServer)
+	opts.replayMessages = messages
 	a := NewApp(log.NewNopLogger(), newOverlayDB(r.db), r.scratch, nil, r.encoding, opts,
 		baseapp.SetChainID(block.ChainID), baseapp.SetIAVLDisableFastNode(true), baseapp.SetIAVLCacheSize(128),
 		baseapp.SetPruning(pruning.NewPruningOptions(pruning.PruningNothing)))
+	if messages.MsgServer == nil {
+		return nil, fmt.Errorf("EVM message service was not registered")
+	}
 	if err := a.LoadHeight(h - 1); err != nil {
 		return nil, fmt.Errorf("open parent %d: %w", h-1, err)
 	}
@@ -161,7 +163,7 @@ func (r *ReplayArchive) execute(ctx context.Context, block *tmtypes.Block, paren
 		id := a.CommitMultiStore().GetCommitKVStore(a.keys[authtypes.StoreKey]).LastCommitID()
 		schedule, err = a.seedVesting(ctx, r.db, id, parent.Time.Unix())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("seed vesting at %d: %w", h-1, err)
 		}
 	}
 
@@ -171,18 +173,19 @@ func (r *ReplayArchive) execute(ctx context.Context, block *tmtypes.Block, paren
 		LastCommitInfo:      abci.CommitInfo{Round: block.LastCommit.Round, Votes: votes},
 		ByzantineValidators: block.Evidence.Evidence.ToABCI(),
 	})
-	observed := make([][]signedCall, len(block.Txs))
+	a.evmKeeper.SetTransactionTracer(messages.trace)
+	observed := make([][]*signedCall, len(block.Txs))
 	results := &tmstate.ABCIResponses{BeginBlock: &begin, DeliverTxs: make([]*abci.ResponseDeliverTx, len(block.Txs))}
 	for i, raw := range block.Txs {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		a.evmKeeper.SetTransactionTracer(func(hash common.Hash) vm.EVMLogger {
-			t := tracer.NewCallTracer(&tracers.Context{TxHash: hash})
-			observed[i] = append(observed[i], signedCall{hash, t})
-			return t
-		})
+		messages.calls = nil
 		res := a.DeliverTx(abci.RequestDeliverTx{Tx: raw})
+		if messages.err != nil {
+			return nil, fmt.Errorf("trace at %d/tx[%d]: %w", h, i, messages.err)
+		}
+		observed[i] = messages.calls
 		results.DeliverTxs[i] = &res
 	}
 	a.evmKeeper.SetTransactionTracer(nil)
@@ -209,11 +212,12 @@ func (r *ReplayArchive) execute(ctx context.Context, block *tmtypes.Block, paren
 	if err != nil {
 		return nil, err
 	}
-	r.vesting, r.vestingParent = schedule, common.BytesToHash(block.Hash())
-	return &rpctypes.DebankOutPutJs{
+	out := &rpctypes.DebankOutPutJs{
 		BlockFile:      file,
 		Header:         header,
 		StateDiff:      wire,
 		ValidationHash: file.Validation().ValidationHash,
-	}, nil
+	}
+	r.vesting, r.vestingParent = schedule, common.BytesToHash(block.Hash())
+	return out, nil
 }

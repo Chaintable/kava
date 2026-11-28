@@ -25,6 +25,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	vesttypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	slashtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -176,6 +177,17 @@ func TestReplayArchive(t *testing.T) {
 	record, _, err := canonical.replayAccount(before, f.Address)
 	require.NoError(t, err)
 	require.Equal(t, f.ParentBalance, record.Balance.ToBig().String())
+	t.Run("underfunded non-ukava vesting lock", func(t *testing.T) {
+		ctx, _ := before.CacheContext()
+		addr := locked.GetAddress()
+		canonical.accountKeeper.SetAccount(ctx, vesttypes.NewDelayedVestingAccount(
+			authtypes.NewBaseAccountWithAddress(addr), sdk.NewCoins(sdk.NewInt64Coin("xrpb", 1)), f.BlockTime.Unix()))
+		ctx.KVStore(canonical.keys[banktypes.StoreKey]).Delete(banktypes.CreatePrefixedAccountStoreKey(addr, []byte("xrpb")))
+		got, _, err := canonical.replayAccount(ctx, f.Address)
+		require.NoError(t, err)
+		require.Equal(t, rem.Balance.BigInt(), got.Balance.ToBig())
+		require.Equal(t, canonical.evmKeeper.GetBalance(ctx, f.Address), got.Balance.ToBig())
+	})
 
 	convert := func(denom string, amount int64) *utiltypes.MsgConvertCosmosCoinToERC20 {
 		msg := utiltypes.NewMsgConvertCosmosCoinToERC20(owner.String(), sender.Hex(), sdk.NewInt64Coin(denom, amount))
@@ -231,9 +243,9 @@ func TestReplayArchive(t *testing.T) {
 	mixed := commitBlock(f.BlockTime.Add(6*time.Second), signNative(0, convert("uone", 5)), batch)
 	native := commitBlock(f.BlockTime.Add(12*time.Second), signNative(1, convert("utwo", 3)))
 	failed := commitBlock(f.BlockTime.Add(18*time.Second), signNative(2, convert("uone", 2), convert("uone", 1_000_000)))
-	// Deploy a contract that initializes slot zero to one and clears it on call.
+	// Deploy a contract that initializes slot zero to one, then clears it and emits LOG0 on call.
 	contract := crypto.CreateAddress(sender, 2)
-	deploy := commitBlock(f.BlockTime.Add(24*time.Second), signEth(2, nil, common.FromHex("0x60016000556006601160003960066000f3600060005500")))
+	deploy := commitBlock(f.BlockTime.Add(24*time.Second), signEth(2, nil, common.FromHex("0x6001600055600b6011600039600b6000f3600060005560006000a000")))
 	clear := commitBlock(f.BlockTime.Add(30*time.Second), signEth(3, &contract, nil), signEth(4, nil, []byte{0x00}))
 	mixedResults, err := sm.LoadABCIResponses(mixed.Height)
 	require.NoError(t, err)
@@ -248,7 +260,7 @@ func TestReplayArchive(t *testing.T) {
 	require.Positive(t, gasPerTransfer)
 	var transfers []tmtypes.Tx
 	for n := int64(0); n < cons.Block.MaxGas/gasPerTransfer+3; n++ {
-		transfers = append(transfers, signEth(uint64(n+5), &f.Address, nil))
+		transfers = append(transfers, signEth(uint64(n+5), &contract, nil))
 	}
 	full := commitBlock(f.BlockTime.Add(36*time.Second), transfers...)
 	commitBlock(f.BlockTime.Add(42 * time.Second))
@@ -264,6 +276,7 @@ func TestReplayArchive(t *testing.T) {
 		require.Equal(t, common.BytesToHash(block.AppHash), d.Hash)
 		return v.BlockFile, &d
 	}
+	checkReplayArchiveFaults(t, replay, blockDB, stateDB, empty.Height, f.Address)
 	file, diff := at(empty)
 	require.Empty(t, file.Txs)
 	require.Equal(t, common.BytesToHash(parent.AppHash), diff.ParentHash)
@@ -356,6 +369,8 @@ func TestReplayArchive(t *testing.T) {
 	require.True(t, neverRan)
 	require.Len(t, file.Txs, listed)
 	require.NotEmpty(t, file.ErrorTraces)
+	require.Len(t, file.ErrorEvents, 1)
+	t.Run("executed block OOG requires tracer", func(t *testing.T) { checkReplayMissingOOGTrace(t, replay, full, val) })
 	_, retry := at(empty)
 	require.Equal(t, common.BytesToHash(parent.AppHash), retry.ParentHash)
 	require.Equal(t, frozen, canonical.LastCommitID())
