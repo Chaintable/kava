@@ -177,6 +177,16 @@ func TestReplayArchive(t *testing.T) {
 	record, _, err := canonical.replayAccount(before, f.Address)
 	require.NoError(t, err)
 	require.Equal(t, f.ParentBalance, record.Balance.ToBig().String())
+	t.Run("invalid archived EVM denomination", func(t *testing.T) {
+		for _, denom := range []string{"", "ukava"} {
+			ctx, _ := before.CacheContext()
+			params := canonical.evmKeeper.GetParams(ctx)
+			params.EvmDenom = denom
+			ctx.KVStore(canonical.keys[evmtypes.StoreKey]).Set(evmtypes.KeyPrefixParams, canonical.appCodec.MustMarshal(&params))
+			_, _, err := canonical.replayAccount(ctx, f.Address)
+			require.ErrorContains(t, err, "EVM balance denomination")
+		}
+	})
 	t.Run("underfunded non-ukava vesting lock", func(t *testing.T) {
 		ctx, _ := before.CacheContext()
 		addr := locked.GetAddress()

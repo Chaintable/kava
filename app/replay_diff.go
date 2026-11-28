@@ -244,6 +244,10 @@ func readStoreChanges(db dbm.DB, name string, height int64, parent, current stor
 }
 
 func (a *App) replayAccount(ctx sdk.Context, addr common.Address) (dtypes.NewAccount, bool, error) {
+	// Ethermint reads the EVM denomination from this version of the store.
+	if denom := a.evmKeeper.GetParams(ctx).EvmDenom; denom != utilkeeper.EvmDenom {
+		return dtypes.NewAccount{}, false, fmt.Errorf("EVM balance denomination at %d is %q, want %q", ctx.BlockHeight(), denom, utilkeeper.EvmDenom)
+	}
 	// SDK SpendableCoins zeros all denominations if any lock is underfunded.
 	// Point reads of the contributing denoms propagate a missing IAVL child.
 	address := sdk.AccAddress(addr.Bytes())
