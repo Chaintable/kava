@@ -13,6 +13,7 @@ import (
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/evmos/ethermint/debank/tracer"
 	dtypes "github.com/evmos/ethermint/debank/types"
 	"github.com/evmos/ethermint/rpc/backend"
@@ -156,8 +157,11 @@ func appendReplayTransaction(file *dtypes.BlockFile, addrs map[common.Address]st
 		if len(data.MsgResponses) == 1 {
 			charged = uint64(outer.GasUsed)
 		}
+		if call.Evm == nil && (len(response.Logs) != 0 || !failsBeforeRootFrame(tx, failure)) {
+			return fmt.Errorf("missing root call for message outcome %q", failure)
+		}
 	}
-	if call != nil && (outer.Code == 0 || call.Evm != nil) {
+	if call != nil && call.Evm != nil {
 		tr, err := call.ReplayResult(failure)
 		if err != nil {
 			return err
@@ -206,6 +210,19 @@ func appendReplayTransaction(file *dtypes.BlockFile, addrs map[common.Address]st
 	transaction.GasFeeCap, transaction.GasTipCap = tx.GasFeeCap(), tx.GasTipCap()
 	file.Txs = append(file.Txs, transaction)
 	return nil
+}
+
+// Geth returns these errors before CaptureStart at call depth zero. The signed
+// message still has a receipt and charged gas, with no VM frames or logs.
+func failsBeforeRootFrame(tx *ethtypes.Transaction, failure string) bool {
+	switch failure {
+	case vm.ErrInsufficientBalance.Error():
+		return true
+	case vm.ErrContractAddressCollision.Error(), vm.ErrNonceUintOverflow.Error():
+		return tx.To() == nil
+	default:
+		return false
+	}
 }
 
 func equalTopics(a, b []string) bool {

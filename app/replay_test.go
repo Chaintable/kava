@@ -29,6 +29,7 @@ import (
 	slashtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	dtypes "github.com/evmos/ethermint/debank/types"
@@ -94,7 +95,15 @@ func TestReplayArchive(t *testing.T) {
 	ethKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	sender := crypto.PubkeyToAddress(ethKey.PublicKey)
-	accs := []authtypes.GenesisAccount{authtypes.NewBaseAccount(owner, key.PubKey(), 0, 0), locked, authtypes.NewBaseAccountWithAddress(sender.Bytes())}
+	// A nonzero nonce at the future CREATE address makes geth reject the
+	// creation before it emits a root frame.
+	collision := crypto.CreateAddress(sender, 4)
+	accs := []authtypes.GenesisAccount{
+		authtypes.NewBaseAccount(owner, key.PubKey(), 0, 0),
+		locked,
+		authtypes.NewBaseAccountWithAddress(sender.Bytes()),
+		authtypes.NewBaseAccount(collision.Bytes(), nil, 0, 1),
+	}
 	ukava, ok := sdk.NewIntFromString(string(f.Ukava))
 	require.True(t, ok)
 	xrpb, ok := sdk.NewIntFromString(string(f.Xrpb))
@@ -225,7 +234,7 @@ func TestReplayArchive(t *testing.T) {
 	// Deploy a contract that initializes slot zero to one and clears it on call.
 	contract := crypto.CreateAddress(sender, 2)
 	deploy := commitBlock(f.BlockTime.Add(24*time.Second), signEth(2, nil, common.FromHex("0x60016000556006601160003960066000f3600060005500")))
-	clear := commitBlock(f.BlockTime.Add(30*time.Second), signEth(3, &contract, nil))
+	clear := commitBlock(f.BlockTime.Add(30*time.Second), signEth(3, &contract, nil), signEth(4, nil, []byte{0x00}))
 	mixedResults, err := sm.LoadABCIResponses(mixed.Height)
 	require.NoError(t, err)
 	require.Zero(t, mixedResults.DeliverTxs[0].Code, mixedResults.DeliverTxs[0].Log)
@@ -239,7 +248,7 @@ func TestReplayArchive(t *testing.T) {
 	require.Positive(t, gasPerTransfer)
 	var transfers []tmtypes.Tx
 	for n := int64(0); n < cons.Block.MaxGas/gasPerTransfer+3; n++ {
-		transfers = append(transfers, signEth(uint64(n+4), &f.Address, nil))
+		transfers = append(transfers, signEth(uint64(n+5), &f.Address, nil))
 	}
 	full := commitBlock(f.BlockTime.Add(36*time.Second), transfers...)
 	commitBlock(f.BlockTime.Add(42 * time.Second))
@@ -294,7 +303,21 @@ func TestReplayArchive(t *testing.T) {
 	}
 	require.True(t, found, "failed Cosmos transaction kept ante sequence")
 	_, created := at(deploy)
-	_, cleared := at(clear)
+	file, cleared := at(clear)
+	earlyFailure, err := sm.LoadABCIResponses(clear.Height)
+	require.NoError(t, err)
+	require.Zero(t, earlyFailure.DeliverTxs[1].Code)
+	var rejectedData sdk.TxMsgData
+	require.NoError(t, rejectedData.Unmarshal(earlyFailure.DeliverTxs[1].Data))
+	require.Len(t, rejectedData.MsgResponses, 1)
+	var rejected evmtypes.MsgEthereumTxResponse
+	require.NoError(t, rejected.Unmarshal(rejectedData.MsgResponses[0].Value))
+	require.Equal(t, vm.ErrContractAddressCollision.Error(), rejected.VmError)
+	require.Len(t, file.Txs, 2)
+	require.False(t, file.Txs[1].Status)
+	require.Equal(t, rejected.GasUsed, file.Txs[1].GasUsed.Uint64())
+	require.Empty(t, file.ErrorTraces)
+	require.Empty(t, file.ErrorEvents)
 	slotHash := crypto.Keccak256Hash(make([]byte, 32))
 	addressHash := crypto.Keccak256Hash(contract.Bytes())
 	valueAt := func(diff *replayWireDiff) *big.Int {
